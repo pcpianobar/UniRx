@@ -324,15 +324,6 @@ namespace UniRx
 
 #if CSHARP_7_OR_LATER || (UNITY_2018_3_OR_NEWER && (NET_STANDARD_2_0 || NET_4_6))
 
-        static readonly Action<object> Callback = CancelCallback;
-
-        static void CancelCallback(object state)
-        {
-            var tuple = (Tuple<ICancellableTaskCompletionSource, IDisposable>)state;
-            tuple.Item2.Dispose();
-            tuple.Item1.TrySetCanceled();
-        }
-
         public static Task<T> WaitUntilExecuteAsync<T>(this IReactiveCommand<T> source, CancellationToken cancellationToken = default(CancellationToken))
         {
             var tcs = new CancellableTaskCompletionSource<T>();
@@ -344,9 +335,18 @@ namespace UniRx
                 tcs.TrySetResult(x);
             }, ex => tcs.TrySetException(ex), () => tcs.TrySetCanceled());
 
-            cancellationToken.Register(Callback, Tuple.Create(tcs, disposable.Disposable), false);
+            cancellationToken.Register(CancelCallback, Tuple.Create(tcs, disposable.Disposable), false);
 
             return tcs.Task;
+
+
+            void CancelCallback(object state)
+            {
+                var tuple = (Tuple<CancellableTaskCompletionSource<T>, IDisposable>)state;
+                tuple.Item2.Dispose();
+                tuple.Item1.TrySetCanceled();
+            }
+
         }
 
         public static System.Runtime.CompilerServices.TaskAwaiter<T> GetAwaiter<T>(this IReactiveCommand<T> command)
